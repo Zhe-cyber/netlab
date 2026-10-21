@@ -1,0 +1,89 @@
+# page.yaml: the words on your page, kept as data like everything else.
+# make_page.py puts each answer under its question. A few sentences each, in your own words;
+# leave a blank line between paragraphs. Refer to YOUR network and YOUR evidence.
+# Never put your name or full student ID here: the page is public.
+
+repository: https://github.com/Zhe-cyber/netlab
+
+answers:
+  planes:
+    question: "Where are the data, control and management planes in your network?"
+    answer: |
+      The data plane is the three Linux bridges, s1, s2 and s3. They forward every frame
+      between my six hosts.
+
+      There is no separate control plane. No routing protocol or controller tells the
+      switches what to do. Each bridge learns MAC addresses by itself, inside the data plane.
+
+      The management plane is my topology.yaml file and build_topo.py. They describe and
+      create the network, and make_page.py documents it from the same file.
+
+  learning:
+    question: "How did your switches learn which port leads to each host? Use your MAC table evidence."
+    answer: |
+      The switches learn by watching the source MAC address of each frame that arrives.
+      When pingall sent traffic, s1 saw frames from h1, h2 and h3 on ports 1, 2 and 3, so
+      it recorded those MACs on those ports.
+
+      In my macs.txt, the MACs of h4, h5 and h6 (00:00:00:00:00:04, :05 and :06) all appear
+      on port 4. Port 4 is s1's link to s2. So s1 only knows those hosts are behind s2,
+      and s2 and s3 learn the rest of the way in the same way.
+
+  kind:
+    question: "Which of the four kinds of programmability is this assignment (a network described as data, then built and documented by scripts)? Why isn't it any of the other three?"
+    answer: |
+      This is (d), automated configuration management. My topology.yaml is the source of
+      truth, and scripts build the network and the web page from it. Git keeps track of
+      every change.
+
+      It is not (a), because I did not change how packets are processed. The bridges work
+      the normal way. It is not (b), because there is no controller making forwarding
+      decisions. It is not (c), because I did not use any device API like NETCONF or
+      RESTCONF. My script creates the network with Mininet directly.
+
+  two_am:
+    question: "Week 1's 2 a.m. change on 40 switches: what would be different if those switches were described like your network?"
+    answer: |
+      The change would be made once, in one data file, instead of logging in to 40
+      switches one by one. A script would then apply it to every switch, which takes
+      minutes instead of most of the night.
+
+      A check like my check() could catch mistakes before anything is changed. Git would
+      show exactly what changed, who changed it and why, and the old version could be
+      restored if something went wrong. The risk is that one mistake in the file reaches
+      all 40 switches at once, which is why checking and reviewing the data matters.
+
+  model:
+    question: "What's the difference between your network's data model and its serialisation? Use YAML and JSON as the example."
+    answer: |
+      The data model is the structure of the information: a list of switches, a list of
+      hosts with a name, an IPv4 and an IPv6 address, and a list of links.
+
+      The serialisation is how that structure is written as text. My topology.yaml and
+      topology.json are two serialisations of the same model, and both built the same
+      network. The only thing lost when converting YAML to JSON was the comments, because
+      JSON has no comments. The comments were never part of the model.
+
+  check:
+    question: "Why is it better to catch bad data in check() than with pingall? What did IPv6 notice about a duplicate address that IPv4 didn't?"
+    answer: |
+      check() finds the problem before the network is built, and says exactly what is
+      wrong, as in my check.txt. With pingall, the broken network is already running, and
+      a duplicate address only shows as one failed ping, so the network looks almost
+      healthy. That makes the real cause hard to find.
+
+      When I gave h2 a copy of h1's addresses, IPv6 noticed. Duplicate Address Detection
+      marked fd00:4982::1 as dadfailed and stopped using it. IPv4 accepted 10.82.0.1 as a
+      secondary address with no warning at all, as shown in my dad.txt.
+
+  git:
+    question: "What does your Git history give you that copying files into folders named topology-v2-final wouldn't?"
+    answer: |
+      Every commit records what changed, when, who changed it and why, in the commit
+      message. git diff shows exactly which lines changed, for example when I added s2
+      and h4, instead of having to compare whole folders by eye.
+
+      I can also go back to any earlier version, such as before I removed the s3-s1 link
+      that made a switching loop. And the history is pushed to GitHub, so others can review
+      it. Folders like topology-v2-final do not show why something changed or which version
+      is really the latest.
