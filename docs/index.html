@@ -23,10 +23,17 @@ The same file builds this network in Mininet and generates this page.</p>
 <h2>The network</h2>
 <section id="hosts"><table><thead><tr><th>Host</th><th>IPv4</th><th>IPv6</th><th>Switch</th></tr></thead><tbody><tr><td>h1</td><td><code>10.82.0.1/24</code></td><td><code>fd00:4982::1/64</code></td><td>s1</td></tr><tr><td>h2</td><td><code>10.82.0.2/24</code></td><td><code>fd00:4982::2/64</code></td><td>s1</td></tr><tr><td>h3</td><td><code>10.82.0.3/24</code></td><td><code>fd00:4982::3/64</code></td><td>s1</td></tr><tr><td>h4</td><td><code>10.82.0.4/24</code></td><td><code>fd00:4982::4/64</code></td><td>s2</td></tr><tr><td>h5</td><td><code>10.82.0.5/24</code></td><td><code>fd00:4982::5/64</code></td><td>s2</td></tr><tr><td>h6</td><td><code>10.82.0.6/24</code></td><td><code>fd00:4982::6/64</code></td><td>s3</td></tr></tbody></table></section>
 <h3>Links</h3>
-<section id="links"><p>TODO: list the links.</p></section>
+<section id="links"><ul><li>h1 — s1</li><li>h2 — s1</li><li>h3 — s1</li><li>h4 — s2</li><li>h5 — s2</li><li>h6 — s3</li><li>s1 — s2</li><li>s2 — s3</li></ul></section>
 <h3>Diagram</h3>
 <pre class="mermaid" id="diagram">graph LR
-  todo[Diagram not generated yet]</pre>
+  h1[&quot;h1&lt;br&gt;10.82.0.1&quot;] --- s1((s1))
+  h2[&quot;h2&lt;br&gt;10.82.0.2&quot;] --- s1((s1))
+  h3[&quot;h3&lt;br&gt;10.82.0.3&quot;] --- s1((s1))
+  h4[&quot;h4&lt;br&gt;10.82.0.4&quot;] --- s2((s2))
+  h5[&quot;h5&lt;br&gt;10.82.0.5&quot;] --- s2((s2))
+  h6[&quot;h6&lt;br&gt;10.82.0.6&quot;] --- s3((s3))
+  s1((s1)) --- s2((s2))
+  s2((s2)) --- s3((s3))</pre>
 
 <h2>Evidence from the running network</h2>
 <section id="evidence"><h3>pingall: every host reaches every other</h3>
