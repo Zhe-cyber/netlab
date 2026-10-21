@@ -60,13 +60,21 @@ def check(spec):
     seen = {}                                   # address -> name of the host that used it first
     for host in spec["hosts"]:
         for key in ("ip", "ipv6"):              # check IPv4 and IPv6
-            if key not in host:                 # ipv6 is optional
+            if key not in host:                 
                 continue
             address = str(host[key]).split("/")[0]    # "10.83.0.2/24" -> "10.83.0.2"
             if address in seen:
                 problems.append(f"{host['name']} and {seen[address]} both use {address}")
             else:
                 seen[address] = host["name"]
+
+    # A3: every link must name a switch or host that exists.
+    nodes = set(spec["switches"]) | {h["name"] for h in spec["hosts"]}
+    for a, b in spec["links"]:
+        for end in (a, b):
+            if end not in nodes:
+                problems.append(f"link {a} - {b} names {end}, which isn't a switch or host")
+                
     return problems
 
 
