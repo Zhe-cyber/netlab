@@ -1,0 +1,49 @@
+# Four routers in a ring. LANs .2 and .3 are summarized by 10.82.2.0/23.
+student_id_last4: "4982"
+routers: [r1, r2, r3, r4]
+
+lans:
+  - name: lan-h1
+    network: 10.82.0.0/24
+    router: r1
+    host: h1
+  - name: lan-h2
+    network: 10.82.1.0/24
+    router: r2
+    host: h2
+  - name: lan-h3
+    network: 10.82.2.0/24
+    router: r3
+    host: h3
+  - name: lan-h4
+    network: 10.82.3.0/24
+    router: r4
+    host: h4
+
+links:
+  - [r1, r2, 10.82.240.0/30]
+  - [r2, r3, 10.82.240.4/30]
+  - [r3, r4, 10.82.240.8/30]
+  - [r4, r1, 10.82.240.12/30]
+
+routes:
+  r1:
+    - to: 10.82.1.0/24
+      via: 10.82.240.2
+    - to: 10.82.2.0/23
+      via: 10.82.240.13
+  r2:
+    - to: 10.82.0.0/24
+      via: 10.82.240.6
+    - to: 10.82.2.0/23
+      via: 10.82.240.6
+  r3:
+    - to: 10.82.0.0/23
+      via: 10.82.240.5
+    - to: 10.82.3.0/24
+      via: 10.82.240.10
+  r4:
+    - to: 10.82.0.0/23
+      via: 10.82.240.14
+    - to: 10.82.2.0/24
+      via: 10.82.240.9
