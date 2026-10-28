@@ -1,0 +1,14 @@
+# Step 10 bad-route example: r2's route back to h1 is missing.
+r1:
+  - to: 10.82.32.0/24
+    via: 10.82.12.2
+  - to: 10.82.32.0/20
+    via: 10.82.13.2
+
+r3:
+  - to: 10.82.32.0/20
+    via: 10.82.23.2
+  - to: 10.82.1.0/24
+    via: 10.82.13.1
+
+r2: []
