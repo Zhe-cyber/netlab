@@ -1,0 +1,28 @@
+# Week 3 page answers. No full student ID is included.
+repository: https://github.com/Zhe-cyber/netlab
+
+answers:
+  design:
+    question: "Describe your design: why these routers, LANs and links, and how you chose the addresses."
+    answer: |
+      I built four routers in a ring, with one LAN and one host on each router. The ring gives traffic a second physical path between routers. I used four /24 LANs from my 10.82.0.0/16 block and four /30 subnets for the router links.
+
+      The LANs are 10.82.0.0/24 through 10.82.3.0/24. The router links use 10.82.240.0/30 through 10.82.240.12/30, keeping them separate from the LANs. Each router has static routes for the remote LANs.
+  summary:
+    question: "Which route summarises several LANs? Which networks does it cover, why is it correct, and what else would it attract if you added a network inside its range?"
+    answer: |
+      The summary is 10.82.2.0/23. It covers h3's 10.82.2.0/24 and h4's 10.82.3.0/24, but not h1 or h2's LANs. Both LANs are reachable through the same neighboring router, so one route can represent them.
+
+      A future network placed anywhere inside 10.82.2.0/23 would also match this route. If it were actually behind a different router, traffic for it could be sent the wrong way unless I added a more-specific route.
+  failure:
+    question: "When you took a link down, what happened, and why couldn't your routes recover even though another path existed? What would have recovered?"
+    answer: |
+      With the r1-r4 link down, h1 could no longer reach h3 using its summary route: r1 still sent 10.82.2.0/23 to r4 across that failed link. The ring had another physical path through r2 and r3, but the static route did not change automatically.
+
+      A routing protocol such as OSPF could detect the failed link and install a route through the remaining path. A manually configured backup route could also provide a fallback, but it would need its own careful checks.
+  control_plane:
+    question: "In your network, what was the control plane? Who worked out the routes, and what does that mean for a network of 40 routers?"
+    answer: |
+      I acted as the control plane: I chose the routes in network.yaml, and build_routed.py checked them before applying them to the routers. The routers only forwarded packets using the routes they were given.
+
+      For 40 routers, planning every static route by hand would be difficult to maintain. A routing protocol or controller could calculate paths and update routers when the topology changes. The checker is still useful for catching mistakes before configuration.
