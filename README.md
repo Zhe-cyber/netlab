@@ -14,4 +14,4 @@ The [Week 6 assignment page](https://zhe-cyber.github.io/netlab/week6/) describe
 
 ## AI use
 
-I used OpenAI Codex to help design the Week 6 overlay, implement the VTEP commands and MTU check, run Mininet and capture evidence, and draft the analysis and lab notes. The assignment page includes measurements and packet captures from the course container.
+I used OpenAI Codex to help design the Week 6 overlay, implement the VTEP commands and MTU check, and double check the captured evidence.
