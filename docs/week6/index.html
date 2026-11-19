@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overlay 4982: my data centre, from data</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 52rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; color: #1f2937; }
+  h1 { font-size: 1.6rem; margin-bottom: .2rem; } h2 { margin-top: 2.2rem; border-bottom: 1px solid #e5e7eb; }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; margin-bottom: 1rem; } th, td { border-bottom: 1px solid #e5e7eb; padding: .35rem .5rem; text-align: left; }
+  pre { background: #111827; color: #f3f4f6; padding: .8rem; border-radius: .4rem; overflow-x: auto; font-size: .82rem; }
+  pre.mermaid { background: none; color: inherit; } pre.missing { background: #fef2f2; color: #991b1b; }
+  .meta, .file { color: #6b7280; font-size: .85rem; } code { font-size: .88em; }
+</style>
+</head>
+<body>
+<p class="meta"><a href="../">← Week 2: my network, built from data</a> · <a href="../week3/">Week 3: routed, from data</a></p>
+<h1>My data centre overlay, from data</h1>
+<p class="meta">Student ID ending 4982 · generated from <code>overlay.yaml</code> by <code>make_page6.py</code> on 2026-11-19</p>
+<p id="summary">4 hypervisors and 2 tenants (6 VMs) on <code>10.82.0.0/16</code>, joined by VXLAN.
+Every tenant's MTU was checked against the underlay before anything was built.</p>
+<p>Repository: <a id="repository" href="https://github.com/Zhe-cyber/netlab">https://github.com/Zhe-cyber/netlab</a></p>
+
+<h2>The design</h2>
+<h3>Hypervisors and the underlay</h3>
+<section id="hypervisors"><p>Underlay <code>10.82.0.0/24</code>, MTU 1500.</p><table><tr><th>Hypervisor</th><th>Underlay address</th><th>VMs</th></tr><tr><td>cedar</td><td><code>10.82.0.1</code></td><td>media1 (media)</td></tr><tr><td>maple</td><td><code>10.82.0.2</code></td><td>media2 (media), studio2 (studio)</td></tr><tr><td>birch</td><td><code>10.82.0.3</code></td><td>media3 (media)</td></tr><tr><td>spruce</td><td><code>10.82.0.4</code></td><td>studio1 (studio), studio3 (studio)</td></tr></table></section>
+<section id="tenants"><h3>media: VNI 4982, <code>10.82.64.0/24</code>, MTU 1450</h3><table><tr><th>VM</th><th>On</th><th>Address</th><th>MAC</th></tr><tr><td>media1</td><td>cedar</td><td><code>10.82.64.10</code></td><td><code>02:00:13:76:00:0a</code></td></tr><tr><td>media2</td><td>maple</td><td><code>10.82.64.11</code></td><td><code>02:00:13:76:00:0b</code></td></tr><tr><td>media3</td><td>birch</td><td><code>10.82.64.12</code></td><td><code>02:00:13:76:00:0c</code></td></tr></table>
+<h3>studio: VNI 5082, <code>10.82.64.0/24</code>, MTU 1450</h3><table><tr><th>VM</th><th>On</th><th>Address</th><th>MAC</th></tr><tr><td>studio1</td><td>spruce</td><td><code>10.82.64.10</code></td><td><code>02:00:13:da:00:0a</code></td></tr><tr><td>studio2</td><td>maple</td><td><code>10.82.64.11</code></td><td><code>02:00:13:da:00:0b</code></td></tr><tr><td>studio3</td><td>spruce</td><td><code>10.82.64.12</code></td><td><code>02:00:13:da:00:0c</code></td></tr></table></section>
+<h3>Diagram</h3>
+<pre class="mermaid" id="diagram">graph TB
+  s1[[underlay switch s1]]
+  cedar[&quot;cedar&lt;br&gt;10.82.0.1&quot;] --- s1
+  maple[&quot;maple&lt;br&gt;10.82.0.2&quot;] --- s1
+  birch[&quot;birch&lt;br&gt;10.82.0.3&quot;] --- s1
+  spruce[&quot;spruce&lt;br&gt;10.82.0.4&quot;] --- s1
+  media1(&quot;media1&lt;br&gt;10.82.64.10&lt;br&gt;media · VNI 4982&quot;) --- cedar
+  media2(&quot;media2&lt;br&gt;10.82.64.11&lt;br&gt;media · VNI 4982&quot;) --- maple
+  media3(&quot;media3&lt;br&gt;10.82.64.12&lt;br&gt;media · VNI 4982&quot;) --- birch
+  studio1(&quot;studio1&lt;br&gt;10.82.64.10&lt;br&gt;studio · VNI 5082&quot;) --- spruce
+  studio2(&quot;studio2&lt;br&gt;10.82.64.11&lt;br&gt;studio · VNI 5082&quot;) --- maple
+  studio3(&quot;studio3&lt;br&gt;10.82.64.12&lt;br&gt;studio · VNI 5082&quot;) --- spruce</pre>
+
+<h2>VTEP commands, as built</h2>
+<p>What <code>tenant_commands()</code> ran on each hypervisor.</p>
+<section id="commands"><h3>cedar</h3>
+<pre id="commands-cedar">ip link add br4982 type bridge
+ip link set br4982 up
+ip link add vxlan4982 type vxlan id 4982 local 10.82.0.1 dstport 4789 dev cedar-eth0
+ip link set vxlan4982 master br4982
+ip link set vxlan4982 up
+ip link set cedar-eth1 master br4982
+ip link set cedar-eth1 up
+bridge fdb append 00:00:00:00:00:00 dev vxlan4982 dst 10.82.0.2
+bridge fdb append 00:00:00:00:00:00 dev vxlan4982 dst 10.82.0.3</pre>
+<h3>maple</h3>
+<pre id="commands-maple">ip link add br4982 type bridge
+ip link set br4982 up
+ip link add vxlan4982 type vxlan id 4982 local 10.82.0.2 dstport 4789 dev maple-eth0
+ip link set vxlan4982 master br4982
+ip link set vxlan4982 up
+ip link set maple-eth1 master br4982
+ip link set maple-eth1 up
+bridge fdb append 00:00:00:00:00:00 dev vxlan4982 dst 10.82.0.1
+bridge fdb append 00:00:00:00:00:00 dev vxlan4982 dst 10.82.0.3
+ip link add br5082 type bridge
+ip link set br5082 up
+ip link add vxlan5082 type vxlan id 5082 local 10.82.0.2 dstport 4789 dev maple-eth0
+ip link set vxlan5082 master br5082
+ip link set vxlan5082 up
+ip link set maple-eth2 master br5082
+ip link set maple-eth2 up
+bridge fdb append 00:00:00:00:00:00 dev vxlan5082 dst 10.82.0.4</pre>
+<h3>birch</h3>
+<pre id="commands-birch">ip link add br4982 type bridge
+ip link set br4982 up
+ip link add vxlan4982 type vxlan id 4982 local 10.82.0.3 dstport 4789 dev birch-eth0
+ip link set vxlan4982 master br4982
+ip link set vxlan4982 up
+ip link set birch-eth1 master br4982
+ip link set birch-eth1 up
+bridge fdb append 00:00:00:00:00:00 dev vxlan4982 dst 10.82.0.1
+bridge fdb append 00:00:00:00:00:00 dev vxlan4982 dst 10.82.0.2</pre>
+<h3>spruce</h3>
+<pre id="commands-spruce">ip link add br5082 type bridge
+ip link set br5082 up
+ip link add vxlan5082 type vxlan id 5082 local 10.82.0.4 dstport 4789 dev spruce-eth0
+ip link set vxlan5082 master br5082
+ip link set vxlan5082 up
+ip link set spruce-eth1 master br5082
+ip link set spruce-eth1 up
+ip link set spruce-eth2 master br5082
+ip link set spruce-eth2 up
+bridge fdb append 00:00:00:00:00:00 dev vxlan5082 dst 10.82.0.2</pre></section>
+
+<h2>Evidence from the running overlay</h2>
+<section id="evidence"><h3>check_mtu() refusing the black-hole design</h3>
+<p class="file">evidence6/check.txt</p>
+<pre id="evidence-check">PROBLEM: tenant media: MTU 1500 + 50 bytes of VXLAN overhead requires 1550, exceeding underlay MTU 1500 by 50 bytes
+PROBLEM: tenant studio: MTU 1500 + 50 bytes of VXLAN overhead requires 1550, exceeding underlay MTU 1500 by 50 bytes
+Fix the design and try again: nothing was built.</pre>
+<h3>Flood and learn: the VTEP table before, the flooded broadcast, the table after</h3>
+<p class="file">evidence6/flood.txt</p>
+<pre id="evidence-flood">== Cedar before traffic ==
+$ cedar bridge fdb show dev vxlan4982
+0e:91:e1:01:77:ae vlan 1 master br4982 permanent
+0e:91:e1:01:77:ae master br4982 permanent
+00:00:00:00:00:00 dst 10.82.0.2 self permanent
+00:00:00:00:00:00 dst 10.82.0.3 self permanent
+
+$ media1 ping -c 2 -W 1 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 56(84) bytes of data.
+64 bytes from 10.82.64.11: icmp_seq=1 ttl=64 time=1.01 ms
+64 bytes from 10.82.64.11: icmp_seq=2 ttl=64 time=0.167 ms
+
+--- 10.82.64.11 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1092ms
+rtt min/avg/max/mdev = 0.167/0.588/1.010/0.421 ms
+
+== Birch underlay capture ==
+tcpdump: listening on birch-eth0, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+12:21:18.422641 IP (tos 0x0, ttl 64, id 2338, offset 0, flags [none], proto UDP (17), length 78)
+    10.82.0.1.57619 &gt; 10.82.0.3.4789: VXLAN, flags [I] (0x08), vni 4982
+ARP, Ethernet (len 6), IPv4 (len 4), Request who-has 10.82.64.11 tell 10.82.64.10, length 28
+
+1 packet captured
+1 packet received by filter
+0 packets dropped by kernel
+
+== VTEPs after traffic ==
+$ cedar bridge fdb show dev vxlan4982
+02:00:13:76:00:0b master br4982
+0e:91:e1:01:77:ae vlan 1 master br4982 permanent
+0e:91:e1:01:77:ae master br4982 permanent
+02:00:13:76:00:0b dst 10.82.0.2 self
+00:00:00:00:00:00 dst 10.82.0.2 self permanent
+00:00:00:00:00:00 dst 10.82.0.3 self permanent
+$ maple bridge fdb show dev vxlan4982
+02:00:13:76:00:0a master br4982
+ea:7e:7f:cf:d5:b3 vlan 1 master br4982 permanent
+ea:7e:7f:cf:d5:b3 master br4982 permanent
+02:00:13:76:00:0a dst 10.82.0.1 self
+00:00:00:00:00:00 dst 10.82.0.1 self permanent
+00:00:00:00:00:00 dst 10.82.0.3 self permanent
+$ birch bridge fdb show dev vxlan4982
+02:00:13:76:00:0a master br4982
+26:89:d8:ff:88:f9 vlan 1 master br4982 permanent
+26:89:d8:ff:88:f9 master br4982 permanent
+02:00:13:76:00:0a dst 10.82.0.1 self
+00:00:00:00:00:00 dst 10.82.0.1 self permanent
+00:00:00:00:00:00 dst 10.82.0.2 self permanent</pre>
+<h3>Two tenants, one address: who answers</h3>
+<p class="file">evidence6/isolation.txt</p>
+<pre id="evidence-isolation">== Media ping and neighbor ==
+$ media1 ping -c 3 -W 1 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 56(84) bytes of data.
+64 bytes from 10.82.64.11: icmp_seq=1 ttl=64 time=0.339 ms
+64 bytes from 10.82.64.11: icmp_seq=2 ttl=64 time=0.131 ms
+64 bytes from 10.82.64.11: icmp_seq=3 ttl=64 time=0.127 ms
+
+--- 10.82.64.11 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2235ms
+rtt min/avg/max/mdev = 0.127/0.199/0.339/0.099 ms
+$ media1 ip neigh show 10.82.64.11
+10.82.64.11 dev media1-eth0 lladdr 02:00:13:76:00:0b REACHABLE
+
+== Studio2 capture during Media ping ==
+tcpdump: listening on studio2-eth0, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+
+0 packets captured
+0 packets received by filter
+0 packets dropped by kernel
+
+== Studio ping and neighbor ==
+$ studio1 ping -c 1 -W 1  10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 56(84) bytes of data.
+64 bytes from 10.82.64.11: icmp_seq=1 ttl=64 time=0.856 ms
+
+--- 10.82.64.11 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.856/0.856/0.856/0.000 ms
+$ studio1 ip neigh show 10.82.64.11
+10.82.64.11 dev studio1-eth0 lladdr 02:00:13:da:00:0b REACHABLE
+
+== All directed pairs within each tenant ==
+$ media1 ping -c 1 -W 1 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 56(84) bytes of data.
+64 bytes from 10.82.64.11: icmp_seq=1 ttl=64 time=0.102 ms
+
+--- 10.82.64.11 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.102/0.102/0.102/0.000 ms
+
+$ media1 ping -c 1 -W 1 10.82.64.12
+PING 10.82.64.12 (10.82.64.12) 56(84) bytes of data.
+64 bytes from 10.82.64.12: icmp_seq=1 ttl=64 time=0.515 ms
+
+--- 10.82.64.12 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.515/0.515/0.515/0.000 ms
+
+$ media2 ping -c 1 -W 1 10.82.64.10
+PING 10.82.64.10 (10.82.64.10) 56(84) bytes of data.
+64 bytes from 10.82.64.10: icmp_seq=1 ttl=64 time=0.097 ms
+
+--- 10.82.64.10 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.097/0.097/0.097/0.000 ms
+
+$ media2 ping -c 1 -W 1 10.82.64.12
+PING 10.82.64.12 (10.82.64.12) 56(84) bytes of data.
+64 bytes from 10.82.64.12: icmp_seq=1 ttl=64 time=0.544 ms
+
+--- 10.82.64.12 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.544/0.544/0.544/0.000 ms
+
+$ media3 ping -c 1 -W 1 10.82.64.10
+PING 10.82.64.10 (10.82.64.10) 56(84) bytes of data.
+64 bytes from 10.82.64.10: icmp_seq=1 ttl=64 time=0.099 ms
+
+--- 10.82.64.10 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.099/0.099/0.099/0.000 ms
+
+$ media3 ping -c 1 -W 1 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 56(84) bytes of data.
+64 bytes from 10.82.64.11: icmp_seq=1 ttl=64 time=0.079 ms
+
+--- 10.82.64.11 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.079/0.079/0.079/0.000 ms
+
+$ studio1 ping -c 1 -W 1 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 56(84) bytes of data.
+64 bytes from 10.82.64.11: icmp_seq=1 ttl=64 time=0.109 ms
+
+--- 10.82.64.11 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.109/0.109/0.109/0.000 ms
+
+$ studio1 ping -c 1 -W 1 10.82.64.12
+PING 10.82.64.12 (10.82.64.12) 56(84) bytes of data.
+64 bytes from 10.82.64.12: icmp_seq=1 ttl=64 time=0.268 ms
+
+--- 10.82.64.12 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.268/0.268/0.268/0.000 ms
+
+$ studio2 ping -c 1 -W 1 10.82.64.10
+PING 10.82.64.10 (10.82.64.10) 56(84) bytes of data.
+64 bytes from 10.82.64.10: icmp_seq=1 ttl=64 time=0.088 ms
+
+--- 10.82.64.10 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.088/0.088/0.088/0.000 ms
+
+$ studio2 ping -c 1 -W 1 10.82.64.12
+PING 10.82.64.12 (10.82.64.12) 56(84) bytes of data.
+64 bytes from 10.82.64.12: icmp_seq=1 ttl=64 time=0.335 ms
+
+--- 10.82.64.12 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.335/0.335/0.335/0.000 ms
+
+$ studio3 ping -c 1 -W 1 10.82.64.10
+PING 10.82.64.10 (10.82.64.10) 56(84) bytes of data.
+64 bytes from 10.82.64.10: icmp_seq=1 ttl=64 time=0.057 ms
+
+--- 10.82.64.10 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.057/0.057/0.057/0.000 ms
+
+$ studio3 ping -c 1 -W 1 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 56(84) bytes of data.
+64 bytes from 10.82.64.11: icmp_seq=1 ttl=64 time=0.102 ms
+
+--- 10.82.64.11 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.102/0.102/0.102/0.000 ms</pre>
+<h3>The black hole: tenant MTU 1500 on a 1500-byte underlay</h3>
+<p class="file">evidence6/blackhole.txt</p>
+<pre id="evidence-blackhole">== Forced build with both MTUs at 1500 ==
+$ media1 ping -c 2 -W 1 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 56(84) bytes of data.
+64 bytes from 10.82.64.11: icmp_seq=1 ttl=64 time=0.807 ms
+64 bytes from 10.82.64.11: icmp_seq=2 ttl=64 time=0.318 ms
+
+--- 10.82.64.11 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1092ms
+rtt min/avg/max/mdev = 0.318/0.562/0.807/0.244 ms
+$ media1 ping -c 2 -W 1 -s 1472 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 1472(1500) bytes of data.
+
+--- 10.82.64.11 ping statistics ---
+2 packets transmitted, 0 received, 100% packet loss, time 1107ms
+$ media1 timeout 20 iperf3 -c 10.82.64.11 -t 5
+Connecting to host 10.82.64.11, port 5201
+[  5] local 10.82.64.10 port 34700 connected to 10.82.64.11 port 5201
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.00   sec  0.00 Bytes  0.00 bits/sec    2   1.41 KBytes
+[  5]   1.00-2.00   sec  0.00 Bytes  0.00 bits/sec    1   1.41 KBytes
+[  5]   2.00-3.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
+[  5]   3.00-4.00   sec  0.00 Bytes  0.00 bits/sec    1   1.41 KBytes
+[  5]   4.00-5.00   sec  0.00 Bytes  0.00 bits/sec    0   1.41 KBytes
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-5.00   sec  0.00 Bytes  0.00 bits/sec    4             sender
+[  5]   0.00-5.00   sec  0.00 Bytes  0.00 bits/sec                  receiver
+
+iperf Done.
+
+== Largest payload received and first payload lost ==
+$ media1 ping -c 1 -W 1 -M do -s 1422 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 1422(1450) bytes of data.
+1430 bytes from 10.82.64.11: icmp_seq=1 ttl=64 time=0.190 ms
+
+--- 10.82.64.11 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.190/0.190/0.190/0.000 ms
+$ media1 ping -c 1 -W 1 -M do -s 1423 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 1423(1451) bytes of data.
+
+--- 10.82.64.11 ping statistics ---
+1 packets transmitted, 0 received, 100% packet loss, time 0ms</pre>
+<h3>Two fixes, measured</h3>
+<p class="file">evidence6/fixes.txt</p>
+<pre id="evidence-fixes">== Fix A: tenant MTU 1450 ==
+$ media1 ping -c 1 -W 1 -M do -s 1422 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 1422(1450) bytes of data.
+1430 bytes from 10.82.64.11: icmp_seq=1 ttl=64 time=0.723 ms
+
+--- 10.82.64.11 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.723/0.723/0.723/0.000 ms
+$ media1 ping -c 1 -W 1 -M do -s 1423 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 1423(1451) bytes of data.
+ping: local error: message too long, mtu=1450
+
+--- 10.82.64.11 ping statistics ---
+1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+$ media1 timeout 20 iperf3 -c 10.82.64.11 -t 5
+Connecting to host 10.82.64.11, port 5201
+[  5] local 10.82.64.10 port 42704 connected to 10.82.64.11 port 5201
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.00   sec   136 MBytes  1.14 Gbits/sec  342    158 KBytes
+[  5]   1.00-2.00   sec   134 MBytes  1.13 Gbits/sec   54    194 KBytes
+[  5]   2.00-3.00   sec   136 MBytes  1.14 Gbits/sec    6    199 KBytes
+[  5]   3.00-4.00   sec   145 MBytes  1.22 Gbits/sec   30    201 KBytes
+[  5]   4.00-5.00   sec   152 MBytes  1.28 Gbits/sec    7    203 KBytes
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-5.00   sec   709 MBytes  1.19 Gbits/sec  439             sender
+[  5]   0.00-5.00   sec   709 MBytes  1.19 Gbits/sec                  receiver
+
+iperf Done.
+
+== Fix B: underlay MTU 9000 ==
+$ media1 ping -c 1 -W 1 -M do -s 1472 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 1472(1500) bytes of data.
+1480 bytes from 10.82.64.11: icmp_seq=1 ttl=64 time=0.615 ms
+
+--- 10.82.64.11 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.615/0.615/0.615/0.000 ms
+$ media1 ping -c 1 -W 1 -M do -s 1473 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 1473(1501) bytes of data.
+ping: local error: message too long, mtu=1500
+
+--- 10.82.64.11 ping statistics ---
+1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+$ media1 timeout 20 iperf3 -c 10.82.64.11 -t 5
+Connecting to host 10.82.64.11, port 5201
+[  5] local 10.82.64.10 port 45008 connected to 10.82.64.11 port 5201
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.00   sec   157 MBytes  1.32 Gbits/sec    5    201 KBytes
+[  5]   1.00-2.00   sec   159 MBytes  1.33 Gbits/sec    8    204 KBytes
+[  5]   2.00-3.00   sec   149 MBytes  1.25 Gbits/sec  148    296 KBytes
+[  5]   3.00-4.00   sec   153 MBytes  1.28 Gbits/sec   14    296 KBytes
+[  5]   4.00-5.00   sec   152 MBytes  1.27 Gbits/sec    8    296 KBytes
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-5.00   sec   781 MBytes  1.31 Gbits/sec  183             sender
+[  5]   0.00-5.00   sec   781 MBytes  1.31 Gbits/sec                  receiver
+
+iperf Done.</pre></section>
+
+<h2>What I learned</h2>
+<section id="answers"><section id="answer-design"><h3>Describe your design: hypervisors, tenants, VNIs and addresses. Which tenants overlap, and why did you place each VM where you did?</h3><p>Cedar, Maple, Birch and Spruce use 10.82.0.1 through 10.82.0.4 on the 10.82.0.0/24 underlay. Media uses VNI 4982 and Studio uses VNI 5082. Both tenants use 10.82.64.0/24, and both assign .10, .11 and .12 to their three VMs.</p><p>I put media1 on Cedar, media2 on Maple and media3 on Birch so Birch could observe a flooded frame during a Cedar-to-Maple ping. Maple also hosts studio2, which puts the two .11 VMs on the same hypervisor for a direct isolation check. Spruce hosts studio1 and studio3, so Studio can communicate both locally and over the tunnel to Maple. I chose MTU 1450 for the tenants on the 1500-byte underlay.</p></section>
+<section id="answer-isolation"><h3>Two of your VMs have the same IP address. Using your evidence, explain how a ping reaches the right one, and what would have to go wrong for one tenant to see another&#x27;s traffic.</h3><p>Both media2 and studio2 use 10.82.64.11 on Maple. media1 resolved that address to 02:00:13:76:00:0b in Media, while studio1 resolved it to 02:00:13:da:00:0b in Studio. The capture on studio2 showed zero packets during the Media pings. All 12 directed same-tenant pings worked afterward.</p><p>Each VM port belongs to its tenant&#x27;s bridge and each VXLAN device accepts traffic for its own VNI. ARP stays inside that tenant, so the same IP can resolve to a different MAC in each segment. Attaching a VM port to the wrong bridge or putting both tenants on the same VXLAN segment could break isolation.</p></section>
+<section id="answer-flood_learn"><h3>Using your evidence, explain what was flooded, to which hypervisors, and what each VTEP learned. With 50 hypervisors in one VNI, how many copies would one broadcast need, and how would EVPN change that?</h3><p>Cedar started with two zero-MAC flood entries, one for Maple and one for Birch. When media1 needed the MAC for 10.82.64.11, Cedar replicated its ARP broadcast to both. The capture on Birch shows that request inside VNI 4982 even though media2 is on Maple. Maple and Birch learned media1&#x27;s MAC behind 10.82.0.1. Cedar learned media2&#x27;s MAC behind 10.82.0.2 from the reply, so it had a unicast destination for subsequent packets.</p><p>Head-end replication across 50 hypervisors in one VNI needs 49 tunnel copies per broadcast. EVPN advertises MAC/IP reachability through BGP, so known destinations can be programmed without waiting for data traffic, and ARP suppression can avoid many broadcasts. Any broadcast that still needs to be flooded still requires replication to its remote recipients.</p></section>
+<section id="answer-mtu"><h3>Compare your two MTU fixes using your measurements. Which would you choose for a data centre, what does each cost, and who has to change what?</h3><p>With both MTUs at 1500, the checker reported a 50-byte shortfall for each tenant. In the forced run, small pings worked, 1422 bytes was the largest ping payload that crossed, and the TCP receiver got 0 bits/s. A 1500-byte tenant IP packet needs 1550 bytes in this IPv4 underlay.</p><p>Fix A kept the underlay at 1500 and set the tenants to 1450. A 1422-byte ping payload fit, 1423 was rejected locally, and the TCP receiver got 1.19 Gbit/s. Fix B kept the tenants at 1500 and raised the underlay to 9000. A 1472-byte payload fit, 1473 was rejected locally, and the receiver got 1.31 Gbit/s. These are single runs in Mininet, so I would not assume the same throughput gap on production hardware.</p><p>I chose A for this design because it works with the existing underlay and the lab controls the VM and access port MTUs. In a data centre where I control the whole physical fabric and need to keep the normal 1500-byte VM MTU, I would choose B. The fabric operator would need to verify jumbo MTU on every path, including alternate paths, and account for the encapsulation on every hop.</p></section>
+<section id="answer-p4"><h3>If your hypervisors&#x27; VTEPs were P4 switches running the lecture&#x27;s vtep.p4, what would have to fill the vtep_encap table, and how? What would replace flood-and-learn?</h3><p>A control plane would program vtep_encap at run time. The lecture pipeline matches the tenant-facing ingress port and the inner destination MAC. An entry supplies the VNI, remote VTEP and underlay forwarding information for encapsulation. Cedar&#x27;s Media ingress port and media2&#x27;s MAC would select VNI 4982 and remote VTEP 10.82.0.2. The control plane also needs decapsulation entries to deliver traffic to the correct local ports.</p><p>A controller could start with static rules from the YAML placement or learn endpoints from EVPN MAC/IP advertisements and program the tables through P4Runtime. With EVPN, control plane advertisements replace reactive remote MAC learning. The example table drops misses, so support for any required broadcast replication would need separate handling.</p></section></section>
+
+<script type="application/json" id="overlay-data">{
+  "design": {
+    "student_id_last4": "4982",
+    "underlay": {
+      "network": "10.82.0.0/24",
+      "mtu": 1500
+    },
+    "hypervisors": [
+      "cedar",
+      "maple",
+      "birch",
+      "spruce"
+    ],
+    "tenants": [
+      {
+        "name": "media",
+        "vni": 4982,
+        "network": "10.82.64.0/24",
+        "mtu": 1450,
+        "vms": [
+          [
+            "media1",
+            "cedar"
+          ],
+          [
+            "media2",
+            "maple"
+          ],
+          [
+            "media3",
+            "birch"
+          ]
+        ]
+      },
+      {
+        "name": "studio",
+        "vni": 5082,
+        "network": "10.82.64.0/24",
+        "mtu": 1450,
+        "vms": [
+          [
+            "studio1",
+            "spruce"
+          ],
+          [
+            "studio2",
+            "maple"
+          ],
+          [
+            "studio3",
+            "spruce"
+          ]
+        ]
+      }
+    ]
+  },
+  "commands": {
+    "cedar": [
+      "ip link add br4982 type bridge",
+      "ip link set br4982 up",
+      "ip link add vxlan4982 type vxlan id 4982 local 10.82.0.1 dstport 4789 dev cedar-eth0",
+      "ip link set vxlan4982 master br4982",
+      "ip link set vxlan4982 up",
+      "ip link set cedar-eth1 master br4982",
+      "ip link set cedar-eth1 up",
+      "bridge fdb append 00:00:00:00:00:00 dev vxlan4982 dst 10.82.0.2",
+      "bridge fdb append 00:00:00:00:00:00 dev vxlan4982 dst 10.82.0.3"
+    ],
+    "maple": [
+      "ip link add br4982 type bridge",
+      "ip link set br4982 up",
+      "ip link add vxlan4982 type vxlan id 4982 local 10.82.0.2 dstport 4789 dev maple-eth0",
+      "ip link set vxlan4982 master br4982",
+      "ip link set vxlan4982 up",
+      "ip link set maple-eth1 master br4982",
+      "ip link set maple-eth1 up",
+      "bridge fdb append 00:00:00:00:00:00 dev vxlan4982 dst 10.82.0.1",
+      "bridge fdb append 00:00:00:00:00:00 dev vxlan4982 dst 10.82.0.3",
+      "ip link add br5082 type bridge",
+      "ip link set br5082 up",
+      "ip link add vxlan5082 type vxlan id 5082 local 10.82.0.2 dstport 4789 dev maple-eth0",
+      "ip link set vxlan5082 master br5082",
+      "ip link set vxlan5082 up",
+      "ip link set maple-eth2 master br5082",
+      "ip link set maple-eth2 up",
+      "bridge fdb append 00:00:00:00:00:00 dev vxlan5082 dst 10.82.0.4"
+    ],
+    "birch": [
+      "ip link add br4982 type bridge",
+      "ip link set br4982 up",
+      "ip link add vxlan4982 type vxlan id 4982 local 10.82.0.3 dstport 4789 dev birch-eth0",
+      "ip link set vxlan4982 master br4982",
+      "ip link set vxlan4982 up",
+      "ip link set birch-eth1 master br4982",
+      "ip link set birch-eth1 up",
+      "bridge fdb append 00:00:00:00:00:00 dev vxlan4982 dst 10.82.0.1",
+      "bridge fdb append 00:00:00:00:00:00 dev vxlan4982 dst 10.82.0.2"
+    ],
+    "spruce": [
+      "ip link add br5082 type bridge",
+      "ip link set br5082 up",
+      "ip link add vxlan5082 type vxlan id 5082 local 10.82.0.4 dstport 4789 dev spruce-eth0",
+      "ip link set vxlan5082 master br5082",
+      "ip link set vxlan5082 up",
+      "ip link set spruce-eth1 master br5082",
+      "ip link set spruce-eth1 up",
+      "ip link set spruce-eth2 master br5082",
+      "ip link set spruce-eth2 up",
+      "bridge fdb append 00:00:00:00:00:00 dev vxlan5082 dst 10.82.0.2"
+    ]
+  }
+}</script>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true });
+</script>
+</body>
+</html>

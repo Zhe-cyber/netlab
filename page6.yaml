@@ -1,0 +1,35 @@
+repository: https://github.com/Zhe-cyber/netlab
+
+answers:
+  design:
+    question: "Describe your design: hypervisors, tenants, VNIs and addresses. Which tenants overlap, and why did you place each VM where you did?"
+    answer: |
+      Cedar, Maple, Birch and Spruce use 10.82.0.1 through 10.82.0.4 on the 10.82.0.0/24 underlay. Media uses VNI 4982 and Studio uses VNI 5082. Both tenants use 10.82.64.0/24, and both assign .10, .11 and .12 to their three VMs.
+
+      I put media1 on Cedar, media2 on Maple and media3 on Birch so Birch could observe a flooded frame during a Cedar-to-Maple ping. Maple also hosts studio2, which puts the two .11 VMs on the same hypervisor for a direct isolation check. Spruce hosts studio1 and studio3, so Studio can communicate both locally and over the tunnel to Maple. I chose MTU 1450 for the tenants on the 1500-byte underlay.
+  isolation:
+    question: "Two of your VMs have the same IP address. Using your evidence, explain how a ping reaches the right one, and what would have to go wrong for one tenant to see another's traffic."
+    answer: |
+      Both media2 and studio2 use 10.82.64.11 on Maple. media1 resolved that address to 02:00:13:76:00:0b in Media, while studio1 resolved it to 02:00:13:da:00:0b in Studio. The capture on studio2 showed zero packets during the Media pings. All 12 directed same-tenant pings worked afterward.
+
+      Each VM port belongs to its tenant's bridge and each VXLAN device accepts traffic for its own VNI. ARP stays inside that tenant, so the same IP can resolve to a different MAC in each segment. Attaching a VM port to the wrong bridge or putting both tenants on the same VXLAN segment could break isolation.
+  flood_learn:
+    question: "Using your evidence, explain what was flooded, to which hypervisors, and what each VTEP learned. With 50 hypervisors in one VNI, how many copies would one broadcast need, and how would EVPN change that?"
+    answer: |
+      Cedar started with two zero-MAC flood entries, one for Maple and one for Birch. When media1 needed the MAC for 10.82.64.11, Cedar replicated its ARP broadcast to both. The capture on Birch shows that request inside VNI 4982 even though media2 is on Maple. Maple and Birch learned media1's MAC behind 10.82.0.1. Cedar learned media2's MAC behind 10.82.0.2 from the reply, so it had a unicast destination for subsequent packets.
+
+      Head-end replication across 50 hypervisors in one VNI needs 49 tunnel copies per broadcast. EVPN advertises MAC/IP reachability through BGP, so known destinations can be programmed without waiting for data traffic, and ARP suppression can avoid many broadcasts. Any broadcast that still needs to be flooded still requires replication to its remote recipients.
+  mtu:
+    question: "Compare your two MTU fixes using your measurements. Which would you choose for a data centre, what does each cost, and who has to change what?"
+    answer: |
+      With both MTUs at 1500, the checker reported a 50-byte shortfall for each tenant. In the forced run, small pings worked, 1422 bytes was the largest ping payload that crossed, and the TCP receiver got 0 bits/s. A 1500-byte tenant IP packet needs 1550 bytes in this IPv4 underlay.
+
+      Fix A kept the underlay at 1500 and set the tenants to 1450. A 1422-byte ping payload fit, 1423 was rejected locally, and the TCP receiver got 1.19 Gbit/s. Fix B kept the tenants at 1500 and raised the underlay to 9000. A 1472-byte payload fit, 1473 was rejected locally, and the receiver got 1.31 Gbit/s. These are single runs in Mininet, so I would not assume the same throughput gap on production hardware.
+
+      I chose A for this design because it works with the existing underlay and the lab controls the VM and access port MTUs. In a data centre where I control the whole physical fabric and need to keep the normal 1500-byte VM MTU, I would choose B. The fabric operator would need to verify jumbo MTU on every path, including alternate paths, and account for the encapsulation on every hop.
+  p4:
+    question: "If your hypervisors' VTEPs were P4 switches running the lecture's vtep.p4, what would have to fill the vtep_encap table, and how? What would replace flood-and-learn?"
+    answer: |
+      A control plane would program vtep_encap at run time. The lecture pipeline matches the tenant-facing ingress port and the inner destination MAC. An entry supplies the VNI, remote VTEP and underlay forwarding information for encapsulation. Cedar's Media ingress port and media2's MAC would select VNI 4982 and remote VTEP 10.82.0.2. The control plane also needs decapsulation entries to deliver traffic to the correct local ports.
+
+      A controller could start with static rules from the YAML placement or learn endpoints from EVPN MAC/IP advertisements and program the tables through P4Runtime. With EVPN, control plane advertisements replace reactive remote MAC learning. The example table drops misses, so support for any required broadcast replication would need separate handling.
