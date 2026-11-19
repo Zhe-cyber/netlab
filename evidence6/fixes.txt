@@ -1,0 +1,59 @@
+== Fix A: tenant MTU 1450 ==
+$ media1 ping -c 1 -W 1 -M do -s 1422 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 1422(1450) bytes of data.
+1430 bytes from 10.82.64.11: icmp_seq=1 ttl=64 time=0.723 ms
+
+--- 10.82.64.11 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.723/0.723/0.723/0.000 ms
+$ media1 ping -c 1 -W 1 -M do -s 1423 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 1423(1451) bytes of data.
+ping: local error: message too long, mtu=1450
+
+--- 10.82.64.11 ping statistics ---
+1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+$ media1 timeout 20 iperf3 -c 10.82.64.11 -t 5
+Connecting to host 10.82.64.11, port 5201
+[  5] local 10.82.64.10 port 42704 connected to 10.82.64.11 port 5201
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.00   sec   136 MBytes  1.14 Gbits/sec  342    158 KBytes
+[  5]   1.00-2.00   sec   134 MBytes  1.13 Gbits/sec   54    194 KBytes
+[  5]   2.00-3.00   sec   136 MBytes  1.14 Gbits/sec    6    199 KBytes
+[  5]   3.00-4.00   sec   145 MBytes  1.22 Gbits/sec   30    201 KBytes
+[  5]   4.00-5.00   sec   152 MBytes  1.28 Gbits/sec    7    203 KBytes
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-5.00   sec   709 MBytes  1.19 Gbits/sec  439             sender
+[  5]   0.00-5.00   sec   709 MBytes  1.19 Gbits/sec                  receiver
+
+iperf Done.
+
+== Fix B: underlay MTU 9000 ==
+$ media1 ping -c 1 -W 1 -M do -s 1472 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 1472(1500) bytes of data.
+1480 bytes from 10.82.64.11: icmp_seq=1 ttl=64 time=0.615 ms
+
+--- 10.82.64.11 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.615/0.615/0.615/0.000 ms
+$ media1 ping -c 1 -W 1 -M do -s 1473 10.82.64.11
+PING 10.82.64.11 (10.82.64.11) 1473(1501) bytes of data.
+ping: local error: message too long, mtu=1500
+
+--- 10.82.64.11 ping statistics ---
+1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+$ media1 timeout 20 iperf3 -c 10.82.64.11 -t 5
+Connecting to host 10.82.64.11, port 5201
+[  5] local 10.82.64.10 port 45008 connected to 10.82.64.11 port 5201
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.00   sec   157 MBytes  1.32 Gbits/sec    5    201 KBytes
+[  5]   1.00-2.00   sec   159 MBytes  1.33 Gbits/sec    8    204 KBytes
+[  5]   2.00-3.00   sec   149 MBytes  1.25 Gbits/sec  148    296 KBytes
+[  5]   3.00-4.00   sec   153 MBytes  1.28 Gbits/sec   14    296 KBytes
+[  5]   4.00-5.00   sec   152 MBytes  1.27 Gbits/sec    8    296 KBytes
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-5.00   sec   781 MBytes  1.31 Gbits/sec  183             sender
+[  5]   0.00-5.00   sec   781 MBytes  1.31 Gbits/sec                  receiver
+
+iperf Done.

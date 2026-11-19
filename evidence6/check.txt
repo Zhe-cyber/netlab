@@ -1,0 +1,3 @@
+PROBLEM: tenant media: MTU 1500 + 50 bytes of VXLAN overhead requires 1550, exceeding underlay MTU 1500 by 50 bytes
+PROBLEM: tenant studio: MTU 1500 + 50 bytes of VXLAN overhead requires 1550, exceeding underlay MTU 1500 by 50 bytes
+Fix the design and try again: nothing was built.
