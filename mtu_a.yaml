@@ -1,0 +1,25 @@
+student_id_last4: "4982"
+
+underlay:
+  network: 10.82.0.0/24
+  mtu: 1500
+
+hypervisors: [cedar, maple, birch, spruce]
+
+tenants:
+  - name: media
+    vni: 4982
+    network: 10.82.64.0/24
+    mtu: 1450
+    vms:
+      - [media1, cedar]
+      - [media2, maple]
+      - [media3, birch]
+  - name: studio
+    vni: 5082
+    network: 10.82.64.0/24
+    mtu: 1450
+    vms:
+      - [studio1, spruce]
+      - [studio2, maple]
+      - [studio3, spruce]
